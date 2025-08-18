@@ -101,9 +101,6 @@ def analyze_data(headers, asset_mode):
     if not data_10 or not data_100:
         return None, [], "?", {}
 
-    # In mẫu record để debug room_id thực tế
-    print("📥 Mẫu record recent_10:", data_10[0])
-
     current_issue_id = data_10[0].get("issue_id")
     killed_room_id = str(data_10[0].get("killed_room_id"))
     current_killed_room = room_names_map.get(killed_room_id, f"Phòng #{killed_room_id}")
@@ -122,7 +119,7 @@ def analyze_data(headers, asset_mode):
 def place_bet(headers, asset, issue_id, room_id, bet_amount):
     url = "https://api.escapemaster.net/escape_game/bet"
     payload = {
-        "asset_type": asset,       # 🔥 fix: dùng asset_type
+        "asset_type": asset,       # fix: dùng asset_type
         "issue_id": str(issue_id),
         "room_id": int(room_id),   # room_id 1..8
         "bet_amount": bet_amount
@@ -147,8 +144,6 @@ def show_wallet(headers):
         r = requests.post(url, headers=headers, timeout=10)
         if r.status_code == 200:
             vi_data = r.json()
-            print("📥 API ví:", vi_data)
-
             balances = {"USDT": 0.0, "WORLD": 0.0, "BUILD": 0.0, "ENERGY": 0.0, "BTC": 0.0}
             if vi_data.get("code") == 0:
                 data = vi_data.get("data", {})
@@ -157,8 +152,15 @@ def show_wallet(headers):
                     for k, v in ua.items():
                         if k in balances:
                             balances[k] = 0.0 if v is None else v
-
-            print(Fore.LIGHTGREEN_EX + f"SỐ DƯ:\nUSDT:{balances['USDT']}  WORLD:{balances['WORLD']}  BUILD:{balances['BUILD']}  ENERGY:{balances['ENERGY']}  BTC:{balances['BTC']}\n")
+            print(
+                Fore.LIGHTGREEN_EX
+                + f"SỐ DƯ:\n"
+                + f"USDT: {balances['USDT']}   "
+                + f"WORLD: {balances['WORLD']}   "
+                + f"BUILD: {balances['BUILD']}   "
+                + f"ENERGY: {balances['ENERGY']}   "
+                + f"BTC: {balances['BTC']}\n"
+            )
             return balances
         else:
             print(f"❌ API ví lỗi HTTP {r.status_code}")
@@ -225,7 +227,7 @@ if __name__ == "__main__":
         print(Fore.CYAN + f"\n🔎 Đang phân tích kỳ {current_issue}")
         if sorted_rooms:
             best_room_id, best_rate = sorted_rooms[0]
-            best_room_name = room_names_map.get(best_room_id, f"Phòng #{best_room_id}")
+            best_room_name = room_names_map.get(str(best_room_id), f"Phòng #{best_room_id}")
 
             print(Fore.MAGENTA + f"🎯 Phòng được chọn: {best_room_name}")
             print(Fore.GREEN + f"Độ tin cậy: {best_rate:.1f}%")
@@ -242,8 +244,9 @@ if __name__ == "__main__":
             # ==== Đặt cược ====
             success = place_bet(headers, asset_mode, pred_id, int(best_room_id), bet_amount)
             if success:
-                pending_issue, pending_room = pred_id, best_room_id
+                pending_issue, pending_room = pred_id, str(best_room_id)
 
+        # ==== Hiển thị sát thủ rõ ràng ====
         print(Fore.RED + f"🔪 Sát thủ kỳ {current_issue}: {killed_room}\n")
 
         show_wallet(headers)
