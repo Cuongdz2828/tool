@@ -83,8 +83,13 @@ def fetch_data(url, headers):
             data = r.json()
             if data.get("code") == 0:
                 return data["data"]
+            else:
+                print("❌ API trả về:", data)
+        else:
+            print(f"❌ Lỗi HTTP {r.status_code} khi gọi {url}")
         return None
-    except:
+    except Exception as e:
+        print(f"⚠️ Lỗi fetch_data: {e}")
         return None
 
 def analyze_data(headers, asset_mode):
@@ -96,9 +101,12 @@ def analyze_data(headers, asset_mode):
     if not data_10 or not data_100:
         return None, [], "?", {}
 
+    # In ra 1 mẫu record để debug room_id thực tế
+    print("📥 Mẫu record recent_10:", data_10[0])
+
     current_issue_id = data_10[0].get("issue_id")
     killed_room_id = str(data_10[0].get("killed_room_id"))
-    current_killed_room = room_names_map.get(killed_room_id, "?")
+    current_killed_room = room_names_map.get(killed_room_id, f"Phòng #{killed_room_id}")
 
     # 100 trận gần nhất
     rates_100 = {}
@@ -116,13 +124,14 @@ def place_bet(headers, asset, issue_id, room_id, bet_amount):
     payload = {
         "asset": asset,
         "issue_id": str(issue_id),
-        "room_id": int(room_id),   # ép kiểu int để tránh lỗi
+        "room_id": room_id,  # dùng id thật từ API
         "bet_amount": bet_amount
     }
     try:
         r = requests.post(url, headers=headers, json=payload, timeout=10)
         if r.status_code == 200:
             data = r.json()
+            print("📥 KQ đặt cược:", data)
             if data.get("code") == 0:
                 print(Fore.GREEN + f"✅ Đặt cược thành công {bet_amount} {asset} vào phòng {room_id} (Kỳ {issue_id})")
                 return True
@@ -141,29 +150,23 @@ def show_wallet(headers):
         r = requests.post(url, headers=headers, timeout=10)
         if r.status_code == 200:
             vi_data = r.json()
-            # Debug in toàn bộ dữ liệu trả về
-            print("📥 Dữ liệu ví:", vi_data)
+            print("📥 API ví:", vi_data)
 
+            balances = {"USDT": 0.0, "WORLD": 0.0, "BUILD": 0.0}
             if vi_data.get("code") == 0:
                 data = vi_data.get("data", [])
-                balances = {"USDT": 0.0, "WORLD": 0.0, "BUILD": 0.0}
-                
-                if isinstance(data, dict):  # Trường hợp data là object
-                    for k, v in data.items():
-                        if k in balances:
-                            balances[k] = v
-                elif isinstance(data, list):  # Trường hợp data là list
-                    for asset in data:
-                        if isinstance(asset, dict):
-                            name = asset.get("asset")
+                if isinstance(data, list):
+                    for item in data:
+                        if isinstance(item, dict):
+                            name = item.get("asset")
                             if name in balances:
-                                balances[name] = asset.get("balance", 0.0)
+                                balances[name] = item.get("balance", 0.0)
 
-                print(Fore.LIGHTGREEN_EX + f"SỐ DƯ:\nUSDT:{balances['USDT']}  WORLD:{balances['WORLD']}  BUILD:{balances['BUILD']}\n")
-                return balances
+            print(Fore.LIGHTGREEN_EX + f"SỐ DƯ:\nUSDT:{balances['USDT']}  WORLD:{balances['WORLD']}  BUILD:{balances['BUILD']}\n")
+            return balances
         else:
-            print(f"❌ API ví trả về lỗi HTTP {r.status_code}")
-        return {}
+            print(f"❌ API ví lỗi HTTP {r.status_code}")
+            return {}
     except Exception as e:
         print(f"⚠️ Lỗi ví: {e}")
         return {}
@@ -188,7 +191,6 @@ if __name__ == "__main__":
     choice = input("Chọn (1-2): ")
     asset_mode = {"1": "BUILD", "2": "USDT"}.get(choice, "BUILD")
 
-    # Nhập số tiền cược
     try:
         bet_amount = float(input("Nhập số tiền cược mỗi trận: ").strip())
     except:
@@ -207,42 +209,39 @@ if __name__ == "__main__":
             time.sleep(5)
             continue
 
-        # Kết quả kỳ trước
         if pending_issue and str(pending_issue) == str(current_issue):
             total_games += 1
             if killed_room != pending_room:
                 total_wins += 1
                 win_streak += 1
                 profit += bet_amount
-                print(Fore.GREEN + f"🎉 Kỳ {current_issue}: THẮNG (AI: {room_names_map.get(pending_room)}, Sát thủ: {killed_room})")
+                print(Fore.GREEN + f"🎉 Kỳ {current_issue}: THẮNG")
             else:
                 win_streak = 0
                 profit -= bet_amount
-                print(Fore.RED + f"💀 Kỳ {current_issue}: THUA (AI: {room_names_map.get(pending_room)}, Sát thủ: {killed_room})")
+                print(Fore.RED + f"💀 Kỳ {current_issue}: THUA")
             pending_issue, pending_room = None, None
             time.sleep(2)
 
         pred_id = str(int(current_issue) + 1)
 
-        # In thông tin
-        print(Fore.CYAN + f"\n🔎 Đang phân tích kết quả cho kỳ {current_issue}")
+        print(Fore.CYAN + f"\n🔎 Đang phân tích kỳ {current_issue}")
         if sorted_rooms:
             best_room_id, best_rate = sorted_rooms[0]
             best_room_name = room_names_map.get(best_room_id, f"Phòng #{best_room_id}")
 
-            print(Fore.MAGENTA + f"🎯 Phòng được chọn: #{best_room_id} ({best_room_name})")
+            print(Fore.MAGENTA + f"🎯 Phòng được chọn: {best_room_name}")
             print(Fore.GREEN + f"Độ tin cậy: {best_rate:.1f}%\n")
 
-            success = place_bet(headers, asset_mode, pred_id, best_room_id, bet_amount)
+            # gửi room_id gốc (int)
+            success = place_bet(headers, asset_mode, pred_id, int(best_room_id), bet_amount)
             if success:
                 pending_issue, pending_room = pred_id, best_room_id
 
         print(Fore.RED + f"🔪 Sát thủ kỳ {current_issue}: {killed_room}\n")
 
-        # In ví
         show_wallet(headers)
 
-        # Chờ kỳ mới
         countdown = 1
         while True:
             time.sleep(1)
