@@ -116,7 +116,7 @@ def place_bet(headers, asset, issue_id, room_id, bet_amount):
     payload = {
         "asset": asset,
         "issue_id": str(issue_id),
-        "room_id": str(room_id),
+        "room_id": int(room_id),   # ép kiểu int để tránh lỗi
         "bet_amount": bet_amount
     }
     try:
@@ -141,22 +141,31 @@ def show_wallet(headers):
         r = requests.post(url, headers=headers, timeout=10)
         if r.status_code == 200:
             vi_data = r.json()
+            # Debug in toàn bộ dữ liệu trả về
+            print("📥 Dữ liệu ví:", vi_data)
+
             if vi_data.get("code") == 0:
                 data = vi_data.get("data", [])
                 balances = {"USDT": 0.0, "WORLD": 0.0, "BUILD": 0.0}
-                if isinstance(data, dict):
+                
+                if isinstance(data, dict):  # Trường hợp data là object
                     for k, v in data.items():
                         if k in balances:
                             balances[k] = v
-                elif isinstance(data, list):
+                elif isinstance(data, list):  # Trường hợp data là list
                     for asset in data:
                         if isinstance(asset, dict):
-                            if asset.get("asset") in balances:
-                                balances[asset.get("asset")] = asset.get("balance", 0.0)
-                print(Fore.LIGHTGREEN_EX + f"SỐ DƯ CỦA BẠN:\nUSDT:{balances['USDT']}  WORLD:{balances['WORLD']}  BUILD:{balances['BUILD']}\n")
+                            name = asset.get("asset")
+                            if name in balances:
+                                balances[name] = asset.get("balance", 0.0)
+
+                print(Fore.LIGHTGREEN_EX + f"SỐ DƯ:\nUSDT:{balances['USDT']}  WORLD:{balances['WORLD']}  BUILD:{balances['BUILD']}\n")
                 return balances
+        else:
+            print(f"❌ API ví trả về lỗi HTTP {r.status_code}")
         return {}
-    except:
+    except Exception as e:
+        print(f"⚠️ Lỗi ví: {e}")
         return {}
 
 # ================== MAIN ==================
